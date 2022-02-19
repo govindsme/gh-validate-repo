@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+clear
+set -e
+
+verbose=""
+name_arg=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+  -h|--help)
+    clear
+		echo ""
+    /usr/bin/printf "\e[1mValidate Repository Extension             \e[0m\n\n"
+    echo "This extension will help you to validate a repository with custom validations set by the platform team"
+		echo " "
+		echo " Usage: "
+		echo " # Install the extension:"
+		echo "	$ gh extension install govindarajanv/gh-validate-repo"
+		echo " # Run the extension: "
+		echo "	$ gh validate-repo"
+    exit 0
+    ;;
+  esac
+  shift
+done
+
+# get org name
+org_name=$(git config remote.origin.url | cut -f4 -d'/')
+
+# get repo name
+repo_name=$(git config remote.origin.url | cut -f5 -d'/'|cut -f1 -d'.')
+
+org_repo=$org_name/$repo_name
+
+# counters
+total_cnt=0
+passed_cnt=0
+
+echo "--------------------------------------------------------------------------------"
+/usr/bin/printf "\e[1m Validating the repository - $org_name/$repo_name							\e[0m"
+echo "\n--------------------------------------------------------------------------------"
+
+echo " "
+#Pass arguments through to another command
+echo "1. Open issues:"
+open_count=$(gh issue list -R $org_repo --json state |grep "OPEN" | wc -l)
+if [ $open_count -eq 0 ]; then
+    /usr/bin/printf "\xE2\x9C\x94 No Open Issues\n"
+    passed_cnt=$((passed_cnt+1))
+else
+    /usr/bin/printf "\u2717 Open issues exists. Total Open Issues found: $open_count \n"
+fi
+total_cnt=$((total_cnt+1))
+
+##Pass arguments through to another command
+#echo "--------------------------------------------------------------------------------"
+## Using the gh api command to retrieve and format information
+# QUERY='
+#   query($endCursor: String) {
+#     viewer {
+#       repositories(first: 100, after: $endCursor) {
+#         nodes {
+#           nameWithOwner
+#           stargazerCount
+#         }
+#       }
+#     }
+#   }
+# '
+# TEMPLATE='
+#   {{- range $repo := .data.viewer.repositories.nodes -}}
+#     {{- printf "name: %s - stargazers: %v\n" $repo.nameWithOwner $repo.stargazerCount -}}
+#   {{- end -}}
+# '
+# exec gh api graphql -f query="${QUERY}" --paginate --template="${TEMPLATE}"
+#echo "--------------------------------------------------------------------------------"
+
+
+echo " "
+# check if README.md exists
+echo "2. Checking if README is present																							"
+FILE="README.md"
+if [ ! -f "./$FILE" ]; then
+    /usr/bin/printf "\u2717 $FILE doesn't exist\n"
+else
+    /usr/bin/printf "\xE2\x9C\x94 $FILE exists \n"
+    passed_cnt=$((passed_cnt+1))
+fi
+total_cnt=$((total_cnt+1))
+
+echo " "
+# check if .gitignore exists
+echo "3. Checking if .gitignore is present																							"
+FILE=".gitignore"
+if [ ! -f "./$FILE" ]; then
+    /usr/bin/printf "\u2717 $FILE doesn't exist\n"
+else
+    /usr/bin/printf "\xE2\x9C\x94 $FILE exists \n"
+    passed_cnt=$((passed_cnt+1))
+fi
+total_cnt=$((total_cnt+1))
+
+echo " "
+# check if workflow yaml exists
+echo "4. Checking if workflow is present																							"
+workflow_count=$(find . \( -name "*.yml" -o -name "*.yaml" \) | grep -i .github/workflows|wc -l)
+if [ $workflow_count -ge 1 ]; then
+    /usr/bin/printf "\xE2\x9C\x94 Workflow exists. Total Workflows found: $workflow_count \n"
+    passed_cnt=$((passed_cnt+1))
+else
+    /usr/bin/printf "\u2717 Workflow doesn't exist\n"
+fi
+total_cnt=$((total_cnt+1))
+
+echo " "
+# check if CODEOWNERS.md exists
+echo "5. Checking if CODEOWNERS.md is present																							"
+FILE="CODEOWNERS.md"
+if [ ! -f "./$FILE" ]; then
+    /usr/bin/printf "\u2717 $FILE doesn't exist\n"
+else
+    /usr/bin/printf "\xE2\x9C\x94 $FILE exists \n"
+    passed_cnt=$((passed_cnt+1))
+fi
+total_cnt=$((total_cnt+1))
+
+
+echo " "
+# check if JIRA ID exists
+echo "6. Checking if JIRA id is present in the commit message 																						"
+std_commits=$(git show -s --format=%B -n 10 | grep -e '[A-Z]\+-[0-9]\+'|wc -l)
+if [ $std_commits -eq 0 ]; then
+    /usr/bin/printf "\u2717 No standard commit exists in last 10 commit messages\n"
+else
+    /usr/bin/printf "\xE2\x9C\x94 standard commits exist. Total standard commits found: $std_commits \n"
+    passed_cnt=$((passed_cnt+1))
+fi
+total_cnt=$((total_cnt+1))
+
+echo " "
+# check if the current repo is part of user's repositories
+echo "7. Checking if the current repo is part of user's repositories"
+repo_in_list=$(gh api /user/repos --paginate --jq .[].name|grep $repo_name|wc -l)
+if [ $repo_in_list -eq 0 ]; then
+    /usr/bin/printf "\u2717 Repo $org_repo not part of user's repositories\n"
+else
+    /usr/bin/printf "\xE2\x9C\x94 Repo $org_repo is part of user's repositories \n"
+    passed_cnt=$((passed_cnt+1))
+fi
+total_cnt=$((total_cnt+1))
+
+
+# ------------------------------------------------
+# Summary
+# -----------------------------------------------
+/usr/bin/printf "\n\e[1;32m Validation Summary for $org_name/$repo_name              \e[0m\n"
+/usr/bin/printf "\n\e[1;33m Total Validations Passed: $passed_cnt out of $total_cnt              \e[0m\n\n"
+echo "--------------------------------------------------------------------------------"
