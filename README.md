@@ -1,4 +1,4 @@
-# GH Extension - Validate a Git repository
+# gh validate-repo GitHub CLI extension - Validate a Git repository
 
 Validate Repository Extension             
 
